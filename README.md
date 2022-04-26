@@ -8,7 +8,7 @@ Before using it, head over to "monitor.json" and run "xrandr --listactivemonitor
 Monitors: 1
  0: +*HDMI-A-0 1920/598x1080/336+0+0  HDMI-A-0
 ```
-Here we can see that I am only using ONE monitor, and its name is "HDMI-A-0". So that's the value I'll be setting my "monitor" to in the JSON file.
+Here we can see that I am only using ONE monitor, and its name is "HDMI-A-0". So that's the value I'll be setting my "monitor" to in the JSON file:
 ```
 {
     "comment": "You can get the name of your monitor by running 'xrandr --listactivemonitors' ",
