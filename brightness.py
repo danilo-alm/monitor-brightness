@@ -62,7 +62,7 @@ exit_status = os.system(command)
 if os.WIFEXITED(exit_status):
     if os.WEXITSTATUS(exit_status) != 0:
         print("An error ocurred")
-        exit(1)
+        sys.exit(1)
 
 print(f"Brightness set to {updated_value}")
 
