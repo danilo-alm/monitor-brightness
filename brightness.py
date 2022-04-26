@@ -29,7 +29,7 @@ data_file = "brightness.data"
 file_exists = os.path.exists(data_file)
 file_size = (os.path.getsize(data_file) if file_exists else 0)
 
-# If file doesn't exist or it's empty, write 1 to it
+# If file doesn't exist or it's empty, write 1 to it (1 is normal brightness)
 if file_size == 0:
     with open(data_file, "wb") as f:
         pickle.dump(1, f)
