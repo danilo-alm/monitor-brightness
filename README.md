@@ -2,7 +2,8 @@
 
 - Requires `xrandr`
 
-A script that uses `python` and `xrandr` to control the brightness level of your monitor. Before using it, head over to "monitor.json" and run "xrandr --listactivemonitors" on your terminal to find out the name of the monitor you're using. For example, on my computer, the command outputs:
+A script that uses `python` and `xrandr` to control the brightness level of your monitor on a software level, allowing you to go below the minimum hardware brightness. <br/>
+Before using it, head over to "monitor.json" and run "xrandr --listactivemonitors" on your terminal to find out the name of the monitor you're using. For example, on my computer, the command outputs:
 ```
 Monitors: 1
  0: +*HDMI-A-0 1920/598x1080/336+0+0  HDMI-A-0
