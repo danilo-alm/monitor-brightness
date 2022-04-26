@@ -1,0 +1,4 @@
+{
+    "comment": "You can get the name of your monitor by running 'xrandr --listactivemonitors' ",
+    "monitor": "HDMI-A-0"
+}
