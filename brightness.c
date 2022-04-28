@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
             counter++;
             if (counter > 1)
             {
-                printf("Error: value is too big\n");
+                printf("Error: too many digits before decimal point\n");
                 return 4;
             }
         }
@@ -142,16 +142,13 @@ int main(int argc, char *argv[])
 // Caps out currentBrightness at 0 or 1 if needed
 void cap_current_brightness(void)
 {
-    if (!(currentBrightness >= 0 && currentBrightness <= 1))
+    if (currentBrightness > 1)
     {
-        if (currentBrightness > 1)
-        {
-            currentBrightness = 1.0;
-        }
-        else
-        {
-            currentBrightness = 0.0;
-        }
+        currentBrightness = 1.0;
+    }
+    else if (currentBrightness < 0)
+    {
+        currentBrightness = 0.0;
     }
 
     return;
