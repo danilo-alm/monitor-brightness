@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
     char userInput[strlen(argv[1]) + 1];
     strcpy(userInput, argv[1]);
 
-    // Check if userInput a is valid
+    // Check if userInput is valid
     bool isValid = true;
     int counter = 0;
     for (int i = 0; userInput[i] != '\0'; i++)
@@ -98,6 +98,7 @@ int main(int argc, char *argv[])
             }
         }
         // Not an option. Just an invalid integer
+		print_usage();
         exit(2);
     }
     if (counter > 2)
