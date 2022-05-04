@@ -4,35 +4,28 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <pwd.h>
 #include <getopt.h>
+#include <errno.h>
 
 // Get user home path
-#define HOMEPATH (getpwuid(getuid()) -> pw_dir)
-
-// Folder where files will be kept
-#define FOLDERNAME ".brightness"
-
-// File in FOLDERNAME where current brightness level will be stored
-#define BRIGHTNESSFILE "brightness"
-
-// File in FOLDERNAME where monitor name level will be stored
-#define MONITORFILE "monitor"
+#define HOMEPATH (getpwuid(getuid())->pw_dir)
 
 // Max length of monitorName
 #define MONITORNAMELENGTH 20
 
-// currentBrightness (0 to 10)
-int currentBrightness = 10;
+// File in home directory where brightness and monitor name will be stored
+#define FILENAME ".brightness"
 
 // Function prototypes
-void cap_current_brightness();
-char *get_monitor_name(char *monitorFilePath, bool forceOverwrite);
+bool validate_input(char *input, int *inplen);
+int get_options(int argc, char **argv);
+int get_info(char *monitorName, int *cbrightness, char *path);
+bool save_info(char *monitorName, int *cbrightness, char *path, bool getMonitor);
+void cap_brightness(int *cbrightness);
 void print_usage();
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
     // Check for bad usage
     if (argc != 2)
@@ -41,120 +34,77 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    // Path to FOLDERNAME
-    char folderPath[strlen(HOMEPATH) + strlen(FOLDERNAME) + 3];
-    strcpy(folderPath, HOMEPATH);
-    strcat(strcat(strcat(folderPath, "/"), FOLDERNAME), "/");
+    // Path to FILENAME
+    char path[strlen(HOMEPATH) + strlen(FILENAME) + 1];
+    path[0] = '\0';
+    strcat(strcat(strcat(path, HOMEPATH), "/"), FILENAME);
 
-    // Path to MONITORFILE
-    char monitorFilePath[strlen(folderPath) + strlen(MONITORFILE) + 1];
-    strcpy(monitorFilePath, folderPath);
-    strcat(monitorFilePath, MONITORFILE);
+    char monitorName[MONITORNAMELENGTH + 1];
+    int cbrightness = 10;
+    int extatus = 0;
 
-    char userInput[strlen(argv[1]) + 1];
-    strcpy(userInput, argv[1]);
-
-    // Check if userInput is valid
-    bool isValid = true;
-    int counter = 0;
-    for (int i = 0; userInput[i] != '\0'; i++)
+    if ((extatus = get_info(monitorName, &cbrightness, path)) == 1)
     {
-        if (isdigit(userInput[i]) == 0 && userInput[i] != '-'
-        && userInput[i] != '+')
+        // `get_info()` returned that `path` doesn't exist
+        if (!save_info(monitorName, &cbrightness, path, true))
         {
-            isValid = false;
-            break;
-        }
-        else if (isdigit(userInput[i]))
-        {
-            counter++;
+            printf("Could not create file '%s'\n", path);
+            exit(1);
         }
     }
-    // Check if value is actually an option
-    if (!isValid)
+    else if (extatus == 2)
     {
-        int option_index = 0;
-        int opt = 0;
-        static struct option long_options[] = {
-            {"detectmonitor", no_argument, 0, 'd'},
-            {"help",          no_argument, 0, 'h'},
-            {0,               0,           0,   0}
-        };
-        while ((opt = getopt_long(argc, argv, "dh", long_options, &option_index)) != -1)
+        printf("Could not open '%s'\n", path);
+        exit(1);
+    }
+
+    // Validate argv[1]
+    int inplen = 0;
+    if (!validate_input(argv[1], &inplen))
+    {
+        // If input is not a valid digit, check if it's an option
+        switch (get_options(argc, argv))
         {
-            switch (opt)
+        case 'h':
+            print_usage();
+            exit(0);
+        case 'd':
+            if (save_info(monitorName, &cbrightness, path, true))
             {
-                case 'd':
-                    printf("Detecting monitor...\n");
-                    char *monitorName = get_monitor_name(monitorFilePath, true);
-                    printf("Monitor: %s. Saved to %s\n", monitorName, monitorFilePath);
-                    free(monitorName);
-                    exit(0);
-                case 'h':
-                    print_usage();
-                    printf("Run it with '--detectmonitor' to re-detect monitor\n");
-                    break;
-                    exit(0);
+                printf("Saved to '%s'\n", path);
             }
+            exit(0);
         }
-        // Not an option. Just an invalid integer
-		print_usage();
-        exit(2);
-    }
-    if (counter > 2)
-    {
-        printf("Value has too many digits\n");
+
+        // If argv[1] is not an option, it's just an invalid input
+        printf("Invalid value\n");
         print_usage();
-        exit(3);
+        exit(1);
     }
-
-    // Create FOLDERNAME in home directory if it doesn't exist yet
-    struct stat st = {0};
-    if (stat(folderPath, &st) == -1)
+    else if (inplen > 3)
     {
-        int status = mkdir(folderPath, 0700);
-        if (status == -1)
-        {
-            printf("Error: could not create directory \"%s\" in \"%s\"\n",
-            FOLDERNAME, HOMEPATH);
-            printf("Make sure there is not a file with the same name in %s\n", HOMEPATH);
-            exit(4);
-        }
+        printf("Value length is too big\n");
+        print_usage();
+        exit(1);
     }
 
-    // Get monitor name
-    char *monitorName = get_monitor_name(monitorFilePath, false);
-
-    // Path to BRIGHTNESSFILE
-    char brightnessFilePath[strlen(folderPath) + strlen(BRIGHTNESSFILE) + 1];
-    strcpy(brightnessFilePath, folderPath);
-    strcat(brightnessFilePath, BRIGHTNESSFILE);
-
-    // If BRIGHTNESSFILE exists, read value in it
-    if (access(brightnessFilePath, F_OK) == 0)
+    // Convert user input to integer
+    int inpvalue = strtol(argv[1], (char **)NULL, 10);
+    if (errno == ERANGE)
     {
-        FILE *f = fopen(brightnessFilePath, "r");
-        if (f == NULL)
-        {
-            printf("Error: couldn't open file %s\n", brightnessFilePath);
-            exit(5);
-        }
-        fread(&currentBrightness, sizeof(int), 1, f);
-        fclose(f);
+        printf("Could not convert value to integer\n");
+        exit(1);
     }
 
-    // Add user value to currentBrightness
-    int userValue = strtol(userInput, (char **)NULL, 10);
-    currentBrightness = currentBrightness + userValue;
-
-    cap_current_brightness();
+    // Add user value to current brightness
+    cbrightness += inpvalue;
+    cap_brightness(&cbrightness);
 
     // Change the brightness
     char command[80];
-    float currentBrightnessFloat = currentBrightness / 10.0;
-    snprintf(command, sizeof(command), "xrandr --output %s "
-    "--brightness %.2f", monitorName, currentBrightnessFloat);
-    free(monitorName);
+    float cbrightnessFloat = cbrightness / 10.0;
+    snprintf(command, sizeof(command), "xrandr --output %s --brightness %.1f",
+             monitorName, cbrightnessFloat);
 
     int exit_status = system(command);
     if (exit_status != 0)
@@ -162,89 +112,151 @@ int main(int argc, char *argv[])
         printf("Error: error running command \"%s\"\n", command);
         exit(6);
     }
-    printf("Current brightness is %i\n", currentBrightness);
+    printf("Current brightness is %f\n", cbrightnessFloat);
 
-    // Write new currentBrightness to file
-    FILE *f = fopen(brightnessFilePath, "w");
-    if (f == NULL)
+    // Save changes to file
+    if (!save_info(monitorName, &cbrightness, path, false))
     {
-        printf("Error: couldn't open file %s\n", brightnessFilePath);
-        exit(5);
+        printf("Could not write to '%s'\n", path);
+        exit(1);
     }
-    fwrite(&currentBrightness, sizeof(int), 1, f);
-    fclose(f);
 
     return 0;
 }
 
+/* Validates input and puts its length in *INPLEN if INPLEN is not NULL. */
+bool validate_input(char *input, int *inplen)
+{
+    int len = 0;
+    bool isValid = true;
+
+    // Check if it's all digits
+    char *c;
+    for (; *(c = &input[len]) != '\0'; len++)
+    {
+        if (isdigit(*c) == 0 && *c != '-' && *c != '+')
+        {
+            isValid = false;
+            // Count rest of characters and break
+            for (; *c != '\0'; c = &input[len++]);
+            break;
+        }
+    }
+    if (inplen != NULL) *inplen = len;
+    return isValid;
+}
+
+// Returns option in argv if there is one
+int get_options(int argc, char **argv)
+{
+    int optionIndex = 0;
+    int opt = 0;
+    static struct option long_options[] = {
+        {"detectmonitor", no_argument, 0, 'd'},
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}};
+    while ((opt = getopt_long(argc, argv, "dh", long_options, &optionIndex)) != -1)
+    {
+        switch (opt)
+        {
+        case 'd':
+            return opt;
+        case 'h':
+            return opt;
+        }
+    }
+    return opt;
+}
+
+/* Puts monitor name and current brightness in `monitorName` and `cbrightness`.
+Returns 1 if path doesn't exist and 2 if could not open path */
+int get_info(char *monitorName, int *cbrightness, char *path)
+{
+    // Check if path already exists
+    if (!(access(path, F_OK) == 0))
+        return 1;
+
+    // Read values in it
+    FILE *f = fopen(path, "r");
+    if (f == NULL)
+        return 2;
+
+    // Brightness value comes first in the value
+    fread(cbrightness, sizeof(int), 1, f);
+
+    // Index in which to add next character
+    int index = 0;
+    char buffer;
+
+    // Read monitor name
+    while (fread(&buffer, sizeof(char), 1, f))
+    {
+        monitorName[index] = buffer;
+        index++;
+    }
+    fclose(f);
+    return 0;
+}
+
+/* Saves `monitorName` and `cbrightness` to `path`. If getMonitor is true, gets monitor
+name running `command` name and saves it to `monitorName` before saving it to file.
+Returns true if information was saved successfully */
+bool save_info(char *monitorName, int *cbrightness, char *path, bool getMonitor)
+{
+    int index = 0;
+    if (getMonitor)
+    {
+        char buff;
+
+        char command[] = "xrandr | grep \"connected primary\" | cut -f1 -d \" \"";
+        FILE *p = popen(command, "r");
+        if (p == NULL)
+            return false;
+
+        // Copy command's output to monitorName
+        while ((buff = fgetc(p)) != EOF && index <= MONITORNAMELENGTH)
+        {
+            monitorName[index] = buff;
+            index++;
+        }
+        pclose(p);
+
+        // Remove newline from output
+        monitorName[index - 1] = '\0';
+        printf("Monitor name is '%s'\n", monitorName);
+    }
+
+    // Create file
+    FILE *f = fopen(path, "w");
+    if (f == NULL)
+        return false;
+
+    // Write brightness to file
+    fwrite(cbrightness, sizeof(int), 1, f);
+
+    // Write monitor name to file
+    fwrite(monitorName, strlen(monitorName) + 1, 1, f);
+    fclose(f);
+
+    return true;
+}
+
+// Prints program usage
 void print_usage()
 {
     printf("Usage: brightness < value > | brightness < -value >\n"
-    "Run 'brightness --detectmonitor' to re-detect primary monitor\n");
-    exit(8);
+           "Run 'brightness --detectmonitor' to re-detect primary monitor\n");
 }
 
 // Caps out currentBrightness at 0 or 10 if needed
-void cap_current_brightness()
+void cap_brightness(int *cbrightness)
 {
-    if (currentBrightness > 10)
+    if (*cbrightness > 10)
     {
-        currentBrightness = 10;
+        *cbrightness = 10;
     }
-    else if (currentBrightness < 0)
+    else if (*cbrightness < 0)
     {
-        currentBrightness = 0;
+        *cbrightness = 0;
     }
-    return;
-}
-
-// Returns primary monitor's name
-char *get_monitor_name(char *monitorFilePath, bool forceOverwrite)
-{
-    char *monitorName = malloc((sizeof(char) * MONITORNAMELENGTH) + 1);
-    FILE *f;
-    // If monitorFilePath already exists, get monitor name from there
-    if ((!forceOverwrite) && access(monitorFilePath, F_OK) == 0)
-    {
-        f = fopen(monitorFilePath, "r");
-        if (f != NULL)
-        {
-            fgets(monitorName, MONITORNAMELENGTH, f);
-            fclose(f);
-            return monitorName;
-        }
-        else
-        {
-            printf("Warning: could not read monitor name from \"%s\"\n", monitorFilePath);
-        }
-    }
-
-    // Command that will output the primary monitor's name
-    char command[] = "xrandr | grep \"connected primary\" | cut -f1 -d \" \"";
-
-    // Store command's output
-    f = popen(command, "r");
-    if (f == NULL)
-    {
-        printf("Error: error running command \"%s\"\n", command);
-        exit(7);
-    }
-    while (fgets(monitorName, MONITORNAMELENGTH + 1, f));
-    pclose(f);
-
-    // Remove newline from monitorName
-    monitorName[strcspn(monitorName, "\n")] = '\0';
-
-    // Write monitor name to file
-    f = fopen(monitorFilePath, "w");
-    if (f != NULL)
-    {
-        fwrite(monitorName, sizeof(char), sizeof(monitorName), f);
-        fclose(f);
-    }
-    else
-    {
-        printf("Warning: could not write monitor name \"%s\" to file \"%s\"\n", monitorName, monitorFilePath);
-    }
-    return monitorName;
 }
