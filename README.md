@@ -2,7 +2,7 @@
 
 - Requires `xrandr`
 
-A script that uses `xrandr` to control the brightness level of your monitor on a software level, allowing you to lower it past the minimum hardware setting. <br/>
+A script that uses `xrandr` to control the brightness level of your primary monitor on a software level, allowing you to lower it past the minimum hardware setting. <br/>
 
 ## Usage
 You use the program by running it along with an integer (From 0 to 10. Positive or negative) to add to the current brightness value. For example:
