@@ -1,6 +1,6 @@
 # Monitor Brightness
 
-This program allows you to control the brightness of your primary monitor from the command line. It uses the `xrandr` command to adjust the brightness and stores the current brightness level in a file for future reference.
+This program allows you to control the brightness of your primary monitor on a software level from the command line. It uses the `xrandr` command to adjust the brightness and stores the current brightness level in a file for future reference.
 
 ## Why?
 
